@@ -1,61 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect  } from 'react';
 import { Button, View, ActivityIndicator, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '../../FireBaseConfig';
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 
-/**
- * Componente de autenticación con Google
- * Maneja tanto el login como el dashboard principal
- */
+WebBrowser.maybeCompleteAuthSession();
+
 export default function GoogleAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const redirectUri = "https://auth.expo.io/@kadirperez/firebase-expo-video"
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    setError(null);
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: '363023465739-f0bj3kgjcfruv8l2737m8ooeliu1d2tj.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+    redirectUri
+  })
 
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      
-      const result = await signInWithPopup(auth, provider);
-      setUser(result.user);
-      console.log('Usuario autenticado:', result.user.email);
-    } catch (err: any) {
-      console.error('Error completo:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('Popup cerrado. Intenta de nuevo si deseas iniciar sesión.');
-      } else if (err.code === 'auth/argument-error') {
-        setError('Error de configuración. Verifica que Firebase Auth esté habilitado correctamente.');
-      } else if (err.code === 'auth/popup-blocked') {
-        setError('Popup bloqueado. Permite popups para este sitio.');
-      } else {
-        setError(`Error: ${err.message}`);
-      }
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    console.log('Redirect URI:', redirectUri);
+    console.log('useEffect ejecutado, response:', response);
+
+    if (response?.type === 'success' && response.authentication) {
+      console.log('Respuesta de autenticación:', response.authentication);
     }
-  };
+  }, [response]);
 
-  const handleSignOut = async () => {
-    try {
-      await auth.signOut();
-      setUser(null);
-    } catch (err: any) {
-      setError(`Error al cerrar sesión: ${err.message}`);
-    }
-  };
 
-  // Pantalla de login
   if (!user) {
     return (
       <View style={styles.loginContainer}>
         <View style={styles.loginCard}>
-          <Text style={styles.loginTitle}>Sistema de Tutorías</Text>
+          <Text style={styles.loginTitle}>Sistema Tutorías</Text>
           <Text style={styles.loginSubtitle}>Accede con tu cuenta institucional para gestionar tus tutorías académicas</Text>
           
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -64,9 +41,13 @@ export default function GoogleAuth() {
             <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
           ) : (
             <>
-              <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
-                <Text style={styles.googleButtonText}>Iniciar sesión con Google</Text>
-              </TouchableOpacity>
+              
+              <Button
+                disabled={!request}
+                title="Iniciar sesión con Google"
+                onPress={() => promptAsync()}
+              />
+
               
               <Text style={styles.orText}>o</Text>
               
@@ -86,10 +67,9 @@ export default function GoogleAuth() {
           )}
         </View>
       </View>
-    );
+    )
   }
 
-  // Dashboard principal
   return (
     <View style={styles.mainContainer}>
       {/* Header */}
@@ -98,9 +78,6 @@ export default function GoogleAuth() {
           <Text style={styles.welcomeText}>¡Hola, {user.displayName?.split(' ')[0] || 'Usuario'}!</Text>
           <Text style={styles.emailText}>{user.email}</Text>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-          <Text style={styles.logoutButtonText}>Salir</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Contenido principal */}
